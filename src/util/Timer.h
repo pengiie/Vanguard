@@ -6,7 +6,10 @@
 #include "../Logger.h"
 
 #define TIMER_LOGGER_NAME "TIMER"
-#define TIMER(name) vanguard::ScopedTimer timer##__LINE__(name)
+
+#define CONCAT_(a,b) a##b
+#define CONCAT(a,b) CONCAT_(a,b)
+#define TIMER(name) vanguard::ScopedTimer CONCAT(timer,__LINE__)(name)
 #define FTIMER() TIMER(__FUNCTION__)
 
 namespace vanguard {

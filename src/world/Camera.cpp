@@ -27,10 +27,6 @@ namespace vanguard {
     void Camera::update(float deltaTime) {
         INFO("Position: ({}, {}, {})", m_position.x, m_position.y, m_position.z);
 
-        auto front = glm::vec3(0.0f, 0.0f, -1.0f);
-        front = glm::rotate(front, glm::radians(m_rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
-        front = glm::rotate(front, glm::radians(-m_rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
-
         auto direction = glm::vec3(0.0f);
         if(Input::isKeyDown(Key::W)) {
             direction += glm::vec3(0.0f, 0.0f, 1.0f);
@@ -53,7 +49,6 @@ namespace vanguard {
         if(glm::length(direction) > 0.0f) {
             const float speed = 2.0f * deltaTime;
             direction = glm::normalize(direction);
-            direction = glm::rotate(direction, glm::radians(m_rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
             direction = glm::rotate(direction, glm::radians(m_rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
             m_position += direction * speed;
         }
@@ -64,8 +59,11 @@ namespace vanguard {
             m_rotation.y += mousePos.x * 0.1f;
         }
 
-        auto negatedPosition = m_position * glm::vec3(1.0f, -1.0f, -1.0f);
-        m_data.view = glm::lookAt(negatedPosition, negatedPosition + front, glm::vec3(0.0f, 1.0f, 0.0f));
+        auto front = glm::vec3(0.0f, 0.0f, 1.0f);
+        front = glm::rotate(front, glm::radians(m_rotation.x), glm::vec3(1.0f, 0.0f, 0.0f));
+        front = glm::rotate(front, glm::radians(m_rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
+
+        m_data.view = glm::lookAt(m_position, m_position + front, glm::vec3(0.0f, -1.0f, 0.0f));
         m_data.projView = m_data.projection * m_data.view;
 
         auto& renderSystem = Application::Get().getRenderSystem();

@@ -1,4 +1,5 @@
 cmake_minimum_required(VERSION 3.23)
+cmake_policy(VERSION 3.23)
 project(vanguard)
 
 set(CMAKE_CXX_STANDARD 20)

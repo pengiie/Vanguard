@@ -10,14 +10,15 @@ namespace vanguard {
         auto& renderSystem = Application::Get().getRenderSystem();
 
         m_terrainColorPaletteBuffer = renderSystem.createUniformBuffer(sizeof(glm::vec3) * 256);
-        renderSystem.updateBuffer(m_terrainColorPaletteBuffer, color::terrainPalette.data(), sizeof(glm::vec3) * color::terrainPalette.size(), false);
+        renderSystem.updateBuffer(m_terrainColorPaletteBuffer, color::terrainPalette.data(), sizeof(glm::vec3) * 256, false);
 
-        const int radius = 1;
-        for(int x = -radius; x <= radius; x++) {
-            for(int z = -radius; z <= radius; z++) {
-                generateChunk({ x, 0, z });
-            }
-        }
+//        const int radius = 1;
+//        for(int x = -radius; x <= radius; x++) {
+//            for(int z = -radius; z <= radius; z++) {
+//                generateChunk({ x, 0, z });
+//            }
+//        }
+        generateChunk({ 0, 0, 0 });
     }
 
     void Terrain::generateChunk(const glm::ivec3& position) {

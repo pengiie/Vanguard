@@ -10,6 +10,7 @@ namespace vanguard {
     struct AllocatedBuffer {
         vk::raii::Buffer buffer;
         Allocation allocation;
+        size_t bufferSize;
     };
 
     struct FrameData {

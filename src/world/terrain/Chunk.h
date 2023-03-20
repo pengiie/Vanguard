@@ -17,7 +17,7 @@ namespace vanguard {
             other.m_voxelBuffer = UNDEFINED_REFERENCE;
         }
 
-        Chunk& operator =(Chunk&& other) {
+        Chunk& operator =(Chunk&& other)  noexcept {
             m_position = other.m_position;
             m_voxels = other.m_voxels;
             m_voxelBuffer = other.m_voxelBuffer;
@@ -31,18 +31,27 @@ namespace vanguard {
 
         void generateVoxelMesh();
 
-        [[nodiscard]] inline glm::ivec3 getLocalPosition(int index) const {
+        static inline bool inBounds(int x, int y, int z) {
+            if(x < 0 || x >= CHUNK_LENGTH) return false;
+            if(y < 0 || y >= CHUNK_LENGTH) return false;
+            if(z < 0 || z >= CHUNK_LENGTH) return false;
+            return true;
+        }
+        [[nodiscard]] static inline glm::ivec3 getLocalPosition(int index) {
             return glm::ivec3{
                 index % CHUNK_LENGTH,
-                (index / CHUNK_AREA) % CHUNK_LENGTH,
-                index / CHUNK_AREA
+                index / CHUNK_AREA,
+                (index / CHUNK_LENGTH) % CHUNK_LENGTH,
             };
         }
-
         inline void setVoxel(int x, int y, int z, const TerrainVoxel& voxel) {
+            if(!inBounds(x, y, z))
+                throw std::runtime_error("Chunk out of bounds");
             m_voxels[x + z * CHUNK_LENGTH + y * CHUNK_AREA] = voxel;
         }
         [[nodiscard]] inline TerrainVoxel getVoxel(int x, int y, int z) const {
+            if(!inBounds(x, y, z))
+                throw std::runtime_error("Chunk out of bounds");
             return m_voxels[x + z * CHUNK_LENGTH + y * CHUNK_AREA];
         }
 

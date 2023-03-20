@@ -9,9 +9,9 @@ namespace vanguard {
     void TerrainGenerator::generateChunk(Chunk& chunk) {
         for (int x = 0; x < CHUNK_LENGTH; x++) {
             for (int z = 0; z < CHUNK_LENGTH; z++) {
-                auto noise = static_cast<float>(m_perlinNoise.noise2D(x, z));
+                auto noise = static_cast<float>(m_perlinNoise.octave2D_01(x, z, 8));
                 for(int y = 0; y < CHUNK_LENGTH; y++) {
-                    if (static_cast<float>(y) < TERRAIN_MAX_HEIGHT * noise) {
+                    if (static_cast<float>(y) < noise*CHUNK_LENGTH) {
                         chunk.setVoxel(x, y, z, { TerrainVoxelType::Grass });
                     }
                 }

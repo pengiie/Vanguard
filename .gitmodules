@@ -1,15 +1,9 @@
-[submodule "ext/spdlog"]
-	path = ext/spdlog
-	url = https://github.com/gabime/spdlog.git
 [submodule "ext/glfw"]
 	path = ext/glfw
 	url = https://github.com/glfw/glfw.git
 [submodule "ext/imgui"]
 	path = ext/imgui
 	url = https://github.com/ocornut/imgui.git
-[submodule "ext/vma"]
-	path = ext/vma
-	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
 [submodule "ext/entt"]
 	path = ext/entt
 	url = https://github.com/skypjack/entt.git
@@ -19,3 +13,9 @@
 [submodule "ext/perlin"]
 	path = ext/perlin
 	url = https://github.com/Reputeless/PerlinNoise.git
+[submodule "ext/spdlog"]
+	path = ext/spdlog
+	url = https://github.com/gabime/spdlog.git
+[submodule "ext/vma"]
+	path = ext/vma
+	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git

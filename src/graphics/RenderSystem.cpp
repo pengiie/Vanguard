@@ -25,8 +25,8 @@ namespace vanguard {
             });
         }
 
-        // Allocate 256 mb for staging buffer
-        m_stagingBuffer = createBuffer(256000000, vk::BufferUsageFlagBits::eTransferSrc, VMA_MEMORY_USAGE_CPU_TO_GPU, false);
+        // Allocate 25.6 mb for staging buffer
+        m_stagingBuffer = createBuffer(25600000, vk::BufferUsageFlagBits::eTransferSrc, VMA_MEMORY_USAGE_CPU_TO_GPU, false);
         m_stagingCommandPool = device.createCommandPool({
             .queueFamilyIndex = Vulkan::getQueueFamilyIndex(),
         });
@@ -107,8 +107,6 @@ namespace vanguard {
             m_renderGraph->createDescriptorSetLayout(frequency, bindings);
             m_renderGraph->createDescriptorSet(frequency);
 
-
-
             for(uint32_t j = 0; j < FRAMES_IN_FLIGHT; j++) {
                 std::vector<std::pair<uint32_t, vk::DescriptorBufferInfo>> bufferInfos;
                 for (const auto& resource: uniformResources) {
@@ -118,7 +116,7 @@ namespace vanguard {
                         bufferInfos.emplace_back(uniformInfo.binding, vk::DescriptorBufferInfo{
                                 .buffer = *buffer.buffer,
                                 .offset = 0,
-                                .range = buffer.allocation.allocationInfo.size
+                                .range = buffer.bufferSize
                         });
                     }
                 }
@@ -203,6 +201,7 @@ namespace vanguard {
         auto& frameData = m_frameData[m_currentFrame];
 
         {
+            TIMER("RenderSystem::fenceWaiting");
             auto result = device.waitForFences({*frameData.inFlightFence}, VK_TRUE, UINT64_MAX);
             if (result != vk::Result::eSuccess) {
                 throw std::runtime_error("Failed to wait for fence");
@@ -229,6 +228,7 @@ namespace vanguard {
 
         // Transition swapchain image to transfer destination
         {
+            TIMER("RenderSystem::recordSwapchainImageTransision");
             frame.swapchainImageTransitionCommandBuffer.begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
             frame.swapchainImageTransitionCommandBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eBottomOfPipe, {}, {}, {}, std::vector<vk::ImageMemoryBarrier>{
                     vk::ImageMemoryBarrier{
@@ -253,9 +253,14 @@ namespace vanguard {
 
         // Execute the render graph
         {
-            frame.renderCommandBuffer.begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
-            m_renderGraph->execute(frame.renderCommandBuffer, m_currentFrame);
-            frame.renderCommandBuffer.end();
+            {
+                TIMER("RenderSystem::recordRenderGraph");
+                frame.renderCommandBuffer.begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
+                m_renderGraph->execute(frame.renderCommandBuffer, m_currentFrame);
+                frame.renderCommandBuffer.end();
+            }
+
+            TIMER("RenderSystem::submitFirstQueue");
 
             vk::CommandBuffer commandBuffers[] = {
                     *frame.swapchainImageTransitionCommandBuffer,
@@ -275,46 +280,55 @@ namespace vanguard {
 
         // Blit the backbuffer image to swapchain image and transition the swapchain image to present
         {
-            vk::Offset3D zeroOffset{0, 0, 0};
-            vk::Offset3D windowSizeOffset{static_cast<int32_t>(window.getWidth()), static_cast<int32_t>(window.getHeight()), 1};
-            std::array<vk::Offset3D, 2> offsets = { zeroOffset, windowSizeOffset };
-            vk::ImageSubresourceLayers subresource{
-                .aspectMask = vk::ImageAspectFlagBits::eColor,
-                .mipLevel = 0,
-                .baseArrayLayer = 0,
-                .layerCount = 1,
-            };
-            vk::ImageBlit blitInfo{
-                .srcSubresource = subresource,
-                .srcOffsets = offsets,
-                .dstSubresource = subresource,
-                .dstOffsets = offsets,
-            };
+            TIMER("RenderSystem::recordBlitCommandBuffer");
+            {
+                vk::Offset3D zeroOffset{0, 0, 0};
+                vk::Offset3D windowSizeOffset{static_cast<int32_t>(window.getWidth()),
+                                              static_cast<int32_t>(window.getHeight()), 1};
+                std::array<vk::Offset3D, 2> offsets = {zeroOffset, windowSizeOffset};
+                vk::ImageSubresourceLayers subresource{
+                        .aspectMask = vk::ImageAspectFlagBits::eColor,
+                        .mipLevel = 0,
+                        .baseArrayLayer = 0,
+                        .layerCount = 1,
+                };
+                vk::ImageBlit blitInfo{
+                        .srcSubresource = subresource,
+                        .srcOffsets = offsets,
+                        .dstSubresource = subresource,
+                        .dstOffsets = offsets,
+                };
 
-            frame.blitCommandBuffer.begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
-            frame.blitCommandBuffer.blitImage(*m_renderGraph->getBackBufferImage(m_currentFrame).image, vk::ImageLayout::eTransferSrcOptimal,
-                                              vk::Image(Vulkan::getSwapchainImages().at(imageIndex).image), vk::ImageLayout::eTransferDstOptimal,
-                                              {blitInfo}, vk::Filter::eNearest);
+                frame.blitCommandBuffer.begin({.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit});
+                frame.blitCommandBuffer.blitImage(*m_renderGraph->getBackBufferImage(m_currentFrame).image,
+                                                  vk::ImageLayout::eTransferSrcOptimal,
+                                                  vk::Image(Vulkan::getSwapchainImages().at(imageIndex).image),
+                                                  vk::ImageLayout::eTransferDstOptimal,
+                                                  {blitInfo}, vk::Filter::eNearest);
 
 
-            frame.blitCommandBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eTransfer, {}, {}, {}, {
-                    vk::ImageMemoryBarrier{
-                        .srcAccessMask = vk::AccessFlagBits::eTransferWrite,
-                        .dstAccessMask = vk::AccessFlagBits::eMemoryRead,
-                        .oldLayout = vk::ImageLayout::eTransferDstOptimal,
-                        .newLayout = vk::ImageLayout::ePresentSrcKHR,
-                        .image = VkImage(Vulkan::getSwapchainImages()[imageIndex].image),
-                        .subresourceRange = vk::ImageSubresourceRange{
-                                .aspectMask = vk::ImageAspectFlagBits::eColor,
-                                .baseMipLevel = 0,
-                                .levelCount = 1,
-                                .baseArrayLayer = 0,
-                                .layerCount = 1
-                        }
-                    }
-            });
+                frame.blitCommandBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer,
+                                                        vk::PipelineStageFlagBits::eTransfer, {}, {}, {}, {
+                                                                vk::ImageMemoryBarrier{
+                                                                        .srcAccessMask = vk::AccessFlagBits::eTransferWrite,
+                                                                        .dstAccessMask = vk::AccessFlagBits::eMemoryRead,
+                                                                        .oldLayout = vk::ImageLayout::eTransferDstOptimal,
+                                                                        .newLayout = vk::ImageLayout::ePresentSrcKHR,
+                                                                        .image = VkImage(
+                                                                                Vulkan::getSwapchainImages()[imageIndex].image),
+                                                                        .subresourceRange = vk::ImageSubresourceRange{
+                                                                                .aspectMask = vk::ImageAspectFlagBits::eColor,
+                                                                                .baseMipLevel = 0,
+                                                                                .levelCount = 1,
+                                                                                .baseArrayLayer = 0,
+                                                                                .layerCount = 1
+                                                                        }
+                                                                }
+                                                        });
 
-            frame.blitCommandBuffer.end();
+                frame.blitCommandBuffer.end();
+            }
+            TIMER("RenderSystem::submitBlitQueue");
 
             vk::PipelineStageFlags waitFlags = vk::PipelineStageFlagBits::eTransfer;
             Vulkan::getQueue().submit({vk::SubmitInfo{
@@ -330,6 +344,7 @@ namespace vanguard {
 
         // Present the swapchain image
         {
+            TIMER("RenderSystem::submitPresentation");
             auto result = Vulkan::getQueue().presentKHR(vk::PresentInfoKHR{
                     .waitSemaphoreCount = 1,
                     .pWaitSemaphores = &*frameData.blitFinishedSemaphore,
@@ -337,7 +352,7 @@ namespace vanguard {
                     .pSwapchains = &*Vulkan::getSwapchain(),
                     .pImageIndices = &imageIndex,
             });
-            if (result == vk::Result::eSuboptimalKHR | result == vk::Result::eErrorOutOfDateKHR) {
+            if (result == vk::Result::eSuboptimalKHR || result == vk::Result::eErrorOutOfDateKHR) {
                 Vulkan::recreateSwapchain(window.getWidth(), window.getHeight());
                 rebake();
                 return;
@@ -345,11 +360,6 @@ namespace vanguard {
         }
 
         m_currentFrame = (m_currentFrame + 1) % FRAMES_IN_FLIGHT;
-
-        {
-            //TIMER("RenderSystem::GPUQueue");
-            //Vulkan::getDevice().waitForFences({*frameData.inFlightFence}, true, UINT64_MAX);
-        }
     }
 
     static AllocatedBuffer allocateBufferStruct(size_t allocationSize, vk::BufferUsageFlags usage, VmaMemoryUsage memoryUsage) {
@@ -368,6 +378,7 @@ namespace vanguard {
         return AllocatedBuffer{
             .buffer = std::move(buffer),
             .allocation = std::move(allocation),
+            .bufferSize = allocationSize
         };
     }
 

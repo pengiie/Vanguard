@@ -78,7 +78,7 @@ namespace vanguard {
     void Chunk::generateVoxelMesh() {
         std::vector<TerrainVoxelVertex> voxelVertices;
         for (int i = 0; i < CHUNK_VOLUME; i++) {
-            glm::vec3 localPosition = getLocalPosition(i) * m_position;
+            glm::vec3 localPosition = getLocalPosition(i);
             TerrainVoxel voxel = m_voxels[i];
             if(voxel.type == TerrainVoxelType::Air) continue;
 

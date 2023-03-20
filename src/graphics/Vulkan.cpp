@@ -66,7 +66,7 @@ namespace vanguard {
 
         s_instance = vk::raii::Instance(s_context, {
                 .pApplicationInfo = &appInfo,
-                .enabledLayerCount = 1,
+                .enabledLayerCount = 0,
                 .ppEnabledLayerNames = validationLayers,
                 .enabledExtensionCount = static_cast<uint32_t>(ccExtensions.size()),
                 .ppEnabledExtensionNames = ccExtensions.data(),
@@ -151,16 +151,26 @@ namespace vanguard {
     }
 
     static void createSwapchain(uint32_t width, uint32_t height) {
-        auto surfaceFormat = vk::Format::eR8G8B8A8Unorm;
+        auto surfaceFormats = s_physicalDevice->getSurfaceFormatsKHR(**s_surface);
+        auto chosenSurfaceFormat = surfaceFormats[0];
         auto presentMode = vk::PresentModeKHR::eFifo;
         uint32_t imageCount = VULKAN_MIN_IMAGE_COUNT + 1;
+
+        auto presentModes = s_physicalDevice->getSurfacePresentModesKHR(**s_surface);
+        for (const auto& mode: presentModes) {
+            if(mode == vk::PresentModeKHR::eMailbox) {
+                presentMode = vk::PresentModeKHR::eMailbox;
+                break;
+            }
+        }
+
 
         s_swapchainExtent = vk::Extent2D{ width, height };
         vk::SwapchainCreateInfoKHR info{
             .surface = **s_surface,
             .minImageCount = imageCount,
-            .imageFormat = surfaceFormat,
-            .imageColorSpace = vk::ColorSpaceKHR::eSrgbNonlinear,
+            .imageFormat = chosenSurfaceFormat.format,
+            .imageColorSpace = chosenSurfaceFormat.colorSpace,
             .imageExtent = s_swapchainExtent,
             .imageArrayLayers = 1,
             .imageUsage = vk::ImageUsageFlagBits::eTransferDst,
