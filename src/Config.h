@@ -1,0 +1,8 @@
+#pragma once
+
+#define VULKAN_HPP_NO_STRUCT_CONSTRUCTORS
+
+#define APPLICATION_NAME "Vanguard"
+#define WINDOW_NAME APPLICATION_NAME
+
+#define FRAMES_IN_FLIGHT 2
