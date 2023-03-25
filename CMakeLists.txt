@@ -52,7 +52,7 @@ set(IMGUI_FILES
         ${IMGUI_DIR}/imgui_tables.cpp
         ${IMGUI_DIR}/imgui_widgets.cpp
         ${IMGUI_DIR}/backends/imgui_impl_glfw.cpp
-        ${IMGUI_DIR}/backends/imgui_impl_vulkan.cpp src/world/terrain/Terrain.cpp src/world/terrain/Terrain.h src/world/terrain/Chunk.cpp src/world/terrain/Chunk.h src/world/terrain/Voxel.h src/world/terrain/Voxel.cpp src/world/terrain/TerrainConstants.h src/world/terrain/TerrainGenerator.cpp src/world/terrain/TerrainGenerator.h)
+        ${IMGUI_DIR}/backends/imgui_impl_vulkan.cpp src/world/terrain/Terrain.cpp src/world/terrain/Terrain.h src/world/terrain/Chunk.cpp src/world/terrain/Chunk.h src/world/terrain/Voxel.h src/world/terrain/Voxel.cpp src/world/terrain/TerrainConstants.h src/world/terrain/TerrainGenerator.cpp src/world/terrain/TerrainGenerator.h src/Scheduler.cpp src/Scheduler.h)
 set(ETC_FILES
         ext/perlin/PerlinNoise.hpp)
 
@@ -84,6 +84,7 @@ set(VULKAN_LIB ${VULKAN_SDK}/lib/vulkan-1.lib)
 
 if(${CMAKE_BUILD_TYPE} STREQUAL "Debug")
     set(SHADERC_LIB ${VULKAN_SDK}/lib/shaderc_combinedd.lib)
+    target_compile_definitions(vanguard PRIVATE VANGUARD_DEBUG)
 else()
     set(SHADERC_LIB ${VULKAN_SDK}/lib/shaderc_combined.lib)
 endif()

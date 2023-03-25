@@ -19,6 +19,17 @@ namespace vanguard {
         return ref;
     }
 
+    ResourceRef RenderGraphBuilder::createStencil(const std::string& name, const vanguard::StencilInfo& info) {
+        ResourceRef ref = m_resources.size();
+
+        std::unique_ptr<StencilResource> resource = std::make_unique<StencilResource>();
+        resource->name = name;
+        resource->info = info;
+        m_resources.push_back(std::move(resource));
+
+        return ref;
+    }
+
     BufferRef RenderGraphBuilder::createUniform(const std::string& name, const vanguard::UniformInfo& info) {
         ResourceRef ref = m_resources.size();
 
@@ -38,7 +49,7 @@ namespace vanguard {
         m_backBuffer = resource;
     }
 
-    ResourceRef RenderGraph::createImage(const ImageResource& resource, vk::ImageUsageFlags usageFlags) {
+    ResourceRef RenderGraph::createImage(const ImageResource& resource, vk::ImageUsageFlags usageFlags, bool isStencil) {
         ResourceRef ref = m_images.size();
 
         auto& device = Vulkan::getDevice();
@@ -62,15 +73,19 @@ namespace vanguard {
             .usage = VMA_MEMORY_USAGE_GPU_ONLY,
             .requiredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
         };
-        vmaAllocateMemoryForImage(*Vulkan::getAllocator(), static_cast<VkImage>(*image), &allocCreateInfo, &allocation.allocation, &allocation.allocationInfo);
-        image.bindMemory(allocation.allocationInfo.deviceMemory, allocation.allocationInfo.offset);
+        {
+            std::lock_guard vmaLock(Vulkan::getVmaMutex());
+            vmaAllocateMemoryForImage(*Vulkan::getAllocator(), static_cast<VkImage>(*image), &allocCreateInfo,
+                                      &allocation.allocation, &allocation.allocationInfo);
+            image.bindMemory(allocation.allocationInfo.deviceMemory, allocation.allocationInfo.offset);
+        }
 
         vk::raii::ImageView imageView = device.createImageView(vk::ImageViewCreateInfo{
                 .image = *image,
                 .viewType = vk::ImageViewType::e2D,
                 .format = resource.info.format,
                 .subresourceRange = vk::ImageSubresourceRange{
-                        .aspectMask = vk::ImageAspectFlagBits::eColor,
+                        .aspectMask = isStencil ? vk::ImageAspectFlagBits::eStencil : vk::ImageAspectFlagBits::eColor,
                         .baseMipLevel = 0,
                         .levelCount = 1,
                         .baseArrayLayer = 0,
@@ -144,7 +159,7 @@ namespace vanguard {
         std::vector<std::pair<std::string, uint32_t>> inputs; /* name, index */
         std::vector<std::pair<std::string, uint32_t>> outputs; /* name, index */
     };
-    RenderPassRef RenderGraph::addRenderPass(vanguard::ReferenceMap& imageReferenceMap,
+    RenderPassRef RenderGraph::addRenderPass(vanguard::ReferenceMap& imageReferenceMap, ResourceRef stencil,
                                              const vanguard::RenderPassInfo& info) {
         RenderPassRef ref = m_renderPasses.size();
 
@@ -161,28 +176,35 @@ namespace vanguard {
                 inputs.push_back(&m_images[imageReferenceMap.at(input)]);
             }
         }
-        std::vector<Image*> outputs;
-        outputs.reserve(info.outputs.size());
+        std::vector<Image*> colorOutputs;
+        colorOutputs.reserve(info.outputs.size());
+        std::vector<std::pair<bool, Image*>> stencilOutputs;
+        stencilOutputs.reserve(info.outputs.size());
         for(ResourceRef output : info.outputs) {
-            outputs.push_back(&m_images[imageReferenceMap.at(output)]);
+            if(stencil == output) {
+                stencilOutputs.emplace_back(m_stencilImages.find(output) == m_stencilImages.end(), &m_images[imageReferenceMap.at(output)]);
+                m_stencilImages.insert(output);
+            } else if(imageReferenceMap.find(output) != imageReferenceMap.end()) {
+                colorOutputs.push_back(&m_images[imageReferenceMap.at(output)]);
+            }
         }
 
         std::vector<vk::AttachmentDescription> attachments;
-        attachments.reserve(inputs.size() + outputs.size());
+        attachments.reserve(inputs.size() + colorOutputs.size());
         for(Image* input : inputs) {
             attachments.push_back(vk::AttachmentDescription{
                 .format = input->info.format,
                 .samples = vk::SampleCountFlagBits::e1,
                 .loadOp = vk::AttachmentLoadOp::eLoad,
                 .storeOp = vk::AttachmentStoreOp::eStore,
-                .stencilLoadOp = vk::AttachmentLoadOp::eDontCare,
-                .stencilStoreOp = vk::AttachmentStoreOp::eDontCare,
+                .stencilLoadOp = vk::AttachmentLoadOp::eLoad,
+                .stencilStoreOp = vk::AttachmentStoreOp::eStore,
                 .initialLayout = vk::ImageLayout::eShaderReadOnlyOptimal,
                 .finalLayout = vk::ImageLayout::eShaderReadOnlyOptimal
             });
             debugInfo.inputs.emplace_back(input->name, static_cast<uint32_t>(attachments.size() - 1));
         }
-        for(Image* output : outputs) {
+        for(Image* output : colorOutputs) {
             attachments.push_back(vk::AttachmentDescription{
                 .format = output->info.format,
                 .samples = vk::SampleCountFlagBits::e1,
@@ -192,6 +214,19 @@ namespace vanguard {
                 .stencilStoreOp = vk::AttachmentStoreOp::eDontCare,
                 .initialLayout = vk::ImageLayout::eUndefined,
                 .finalLayout = vk::ImageLayout::eColorAttachmentOptimal
+            });
+            debugInfo.outputs.emplace_back(output->name, static_cast<uint32_t>(attachments.size() - 1));
+        }
+        for(auto& [clearOnLoad, output] : stencilOutputs) {
+            attachments.push_back(vk::AttachmentDescription{
+                    .format = output->info.format,
+                    .samples = vk::SampleCountFlagBits::e1,
+                    .loadOp = clearOnLoad ? vk::AttachmentLoadOp::eClear : vk::AttachmentLoadOp::eLoad,
+                    .storeOp = vk::AttachmentStoreOp::eStore,
+                    .stencilLoadOp = clearOnLoad ? vk::AttachmentLoadOp::eClear : vk::AttachmentLoadOp::eLoad,
+                    .stencilStoreOp = vk::AttachmentStoreOp::eStore,
+                    .initialLayout = clearOnLoad ? vk::ImageLayout::eUndefined : vk::ImageLayout::eDepthStencilAttachmentOptimal,
+                    .finalLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal
             });
             debugInfo.outputs.emplace_back(output->name, static_cast<uint32_t>(attachments.size() - 1));
         }
@@ -205,12 +240,21 @@ namespace vanguard {
             });
         }
 
-        std::vector<vk::AttachmentReference> outputAttachments;
-        outputAttachments.reserve(outputs.size());
-        for(size_t i = 0; i < outputs.size(); i++) {
-            outputAttachments.push_back(vk::AttachmentReference{
+        std::vector<vk::AttachmentReference> colorAttachments;
+        colorAttachments.reserve(colorOutputs.size());
+        for(size_t i = 0; i < colorOutputs.size(); i++) {
+            colorAttachments.push_back(vk::AttachmentReference{
                 .attachment = static_cast<uint32_t>(i + inputs.size()),
                 .layout = vk::ImageLayout::eColorAttachmentOptimal
+            });
+        }
+
+        std::vector<vk::AttachmentReference> stencilAttachments;
+        stencilAttachments.reserve(stencilOutputs.size());
+        for(size_t i = 0; i < stencilOutputs.size(); i++) {
+            stencilAttachments.push_back(vk::AttachmentReference{
+                    .attachment = static_cast<uint32_t>(i + inputs.size() + colorOutputs.size()),
+                    .layout = vk::ImageLayout::eDepthStencilAttachmentOptimal
             });
         }
 
@@ -220,25 +264,18 @@ namespace vanguard {
                 .pipelineBindPoint = vk::PipelineBindPoint::eGraphics,
                 .inputAttachmentCount = static_cast<uint32_t>(inputAttachments.size()),
                 .pInputAttachments = inputAttachments.data(),
-                .colorAttachmentCount = static_cast<uint32_t>(outputAttachments.size()),
-                .pColorAttachments = outputAttachments.data(),
+                .colorAttachmentCount = static_cast<uint32_t>(colorAttachments.size()),
+                .pColorAttachments = colorAttachments.data(),
+                .pDepthStencilAttachment = stencilAttachments.empty() ? nullptr : &stencilAttachments[0],
         };
         std::vector<vk::SubpassDependency> dependencies = {
                 vk::SubpassDependency{
                     .srcSubpass = VK_SUBPASS_EXTERNAL,
                     .dstSubpass = 0,
-                    .srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput,
-                    .dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput,
+                    .srcStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests,
+                    .dstStageMask = vk::PipelineStageFlagBits::eColorAttachmentOutput | vk::PipelineStageFlagBits::eEarlyFragmentTests,
                     .srcAccessMask = {},
-                    .dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite,
-                },
-                vk::SubpassDependency{
-                    .srcSubpass = 0,
-                    .dstSubpass = VK_SUBPASS_EXTERNAL,
-                    .srcStageMask = vk::PipelineStageFlagBits::eVertexInput,
-                    .dstStageMask = vk::PipelineStageFlagBits::eVertexInput,
-                    .srcAccessMask = {},
-                    .dstAccessMask = vk::AccessFlagBits::eVertexAttributeRead,
+                    .dstAccessMask = vk::AccessFlagBits::eColorAttachmentWrite | vk::AccessFlagBits::eDepthStencilAttachmentWrite,
                 }
         };
         vk::raii::RenderPass renderPass = device.createRenderPass(vk::RenderPassCreateInfo{
@@ -251,12 +288,15 @@ namespace vanguard {
         });
 
         std::vector<vk::ImageView> imageViews;
-        imageViews.reserve(inputs.size() + outputs.size());
+        imageViews.reserve(inputs.size() + colorOutputs.size() + stencilOutputs.size());
 
         for(Image* input : inputs) {
             imageViews.push_back(*(input->imageData.imageView));
         }
-        for(Image* output : outputs) {
+        for(Image* output : colorOutputs) {
+            imageViews.push_back(*(output->imageData.imageView));
+        }
+        for(auto& [_, output] : stencilOutputs) {
             imageViews.push_back(*(output->imageData.imageView));
         }
 
@@ -360,11 +400,19 @@ namespace vanguard {
                 .alphaToOneEnable = VK_FALSE
         };
 
-        // TODO: Add depth stencil support
         vk::PipelineDepthStencilStateCreateInfo depthStencilStateInfo{
                 .depthTestEnable = VK_FALSE,
                 .stencilTestEnable = VK_FALSE
         };
+        if(stencil != UNDEFINED_REFERENCE) {
+            depthStencilStateInfo = {
+                    .depthTestEnable = VK_TRUE,
+                    .depthWriteEnable = VK_TRUE,
+                    .depthCompareOp = vk::CompareOp::eLess,
+                    .depthBoundsTestEnable = VK_FALSE,
+                    .stencilTestEnable = VK_FALSE,
+            };
+        }
 
         vk::PipelineColorBlendAttachmentState colorBlendAttachment{
                 .blendEnable = VK_FALSE,
@@ -425,8 +473,15 @@ namespace vanguard {
         clearColorValue.setFloat32(info.clearColor);
         vk::ClearValue clearValue;
         clearValue.setColor(clearColorValue);
-        for (auto& output : info.outputs) {
+        for (auto& output : colorAttachments) {
             clearValues.push_back(clearValue);
+        }
+        if(stencil != UNDEFINED_REFERENCE) {
+            vk::ClearDepthStencilValue clearDepthValue;
+            clearDepthValue.depth = 1.0f;
+            vk::ClearValue clearDepth;
+            clearDepth.setDepthStencil(clearDepthValue);
+            clearValues.emplace_back(clearDepth);
         }
 
         m_renderPasses.push_back(vanguard::RenderPass{

@@ -46,11 +46,14 @@ namespace vanguard {
         if(Input::isKeyDown(Key::LeftShift)) {
             direction += glm::vec3(0.0f, -1.0f, 0.0f);
         }
+        float speed = 5.0f;
+        if(Input::isKeyDown(Key::LeftControl)) {
+            speed *= 2.5f;
+        }
         if(glm::length(direction) > 0.0f) {
-            const float speed = 2.0f * deltaTime;
             direction = glm::normalize(direction);
             direction = glm::rotate(direction, glm::radians(m_rotation.y), glm::vec3(0.0f, 1.0f, 0.0f));
-            m_position += direction * speed;
+            m_position += direction * speed * deltaTime;
         }
 
         auto mousePos = Input::getMousePosition();

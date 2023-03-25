@@ -15,21 +15,29 @@ namespace vanguard {
     // RenderGraphBuilder structs
     enum class ResourceType {
         Image,
+        Stencil,
         Uniform
     };
 
     struct Resource {
         std::string name;
+        Resource() = default;
         virtual ResourceType getType() = 0;
     };
 
     struct ImageInfo {
         vk::Format format = vk::Format::eUndefined;
     };
+    typedef ImageInfo StencilInfo;
 
     struct ImageResource : Resource {
         ImageInfo info{};
+        ImageResource() = default;
         ResourceType getType() override { return ResourceType::Image; }
+    };
+    struct StencilResource : Resource {
+        StencilInfo info{};
+        ResourceType getType() override { return ResourceType::Stencil; }
     };
 
     enum class UniformFrequency: uint8_t {
@@ -93,6 +101,7 @@ namespace vanguard {
     class RenderGraphBuilder {
     public:
         ResourceRef createImage(const std::string& name, const ImageInfo& info);
+        ResourceRef createStencil(const std::string& name, const StencilInfo& info);
         ResourceRef createUniform(const std::string& name, const UniformInfo& info);
 
         void addRenderPass(const RenderPassInfo& info);
@@ -176,11 +185,12 @@ namespace vanguard {
         RenderGraph& operator=(RenderGraph&) = delete;
         RenderGraph& operator=(RenderGraph&&) = delete;
 
-        ResourceRef createImage(const ImageResource& resource, vk::ImageUsageFlags usageFlags);
+        ResourceRef createImage(const ImageResource& resource, vk::ImageUsageFlags usageFlags, bool isStencil);
+
         void createDescriptorSetLayout(UniformFrequency frequency, const std::vector<vk::DescriptorSetLayoutBinding>& bindings);
         void createDescriptorSet(UniformFrequency frequency);
         void updateDescriptorBindings(UniformFrequency frequency, uint32_t currentFrame, const std::vector<std::pair<uint32_t, vk::DescriptorBufferInfo>>& bufferBindings);
-        RenderPassRef addRenderPass(ReferenceMap& imageReferenceMap, const RenderPassInfo& info);
+        RenderPassRef addRenderPass(ReferenceMap& imageReferenceMap, ResourceRef stencil, const RenderPassInfo& info);
 
         template<typename T>
         void addCommand(const T& command) {
@@ -196,6 +206,8 @@ namespace vanguard {
         std::vector<Image> m_images;
         DescriptorSetData m_descriptorSet;
         std::vector<std::unique_ptr<RenderGraphCommand>> m_commands;
+
+        std::unordered_set<ResourceRef> m_stencilImages;
 
         ResourceRef m_backBuffer = UNDEFINED_REFERENCE;
     };

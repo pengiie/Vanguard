@@ -5,6 +5,8 @@
 #include "../assets/Assets.h"
 #include "terrain/Terrain.h"
 
+#include <mutex>
+
 namespace vanguard {
     class WorldScene : public Scene {
     public:
@@ -16,8 +18,12 @@ namespace vanguard {
     private:
         static void loadAssets(Assets& assets);
     private:
+        std::mutex m_registryMutex;
+
         Camera m_camera{};
 
-        Terrain m_terrain = Terrain(m_registry);
+        Terrain m_terrain = Terrain(m_registry, m_registryMutex);
+
+        uint32_t m_lastFrame = 0;
     };
 }

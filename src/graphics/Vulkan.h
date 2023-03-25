@@ -8,6 +8,8 @@
 #include "../ImGuiWindow.h"
 #include "../Window.h"
 
+#include <mutex>
+
 namespace vanguard {
     struct SwapchainImage {
         VkImage image;
@@ -36,5 +38,6 @@ namespace vanguard {
         static std::vector<SwapchainImage>& getSwapchainImages();
         static Allocator& getAllocator();
         static vk::raii::DescriptorPool& getDescriptorPool();
+        static std::mutex& getVmaMutex();
     };
 }

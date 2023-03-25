@@ -19,6 +19,7 @@ namespace vanguard {
     static vk::Extent2D s_swapchainExtent;
     static std::vector<SwapchainImage> s_swapchainImages;
     static std::optional<Allocator> s_allocator;
+    static std::mutex s_vmaMutex;
     static std::optional<vk::raii::DescriptorPool> s_descriptorPool;
 
     static VKAPI_ATTR VkBool32 VKAPI_CALL debugMessengerFunc( VkDebugUtilsMessageSeverityFlagBitsEXT       messageSeverity,
@@ -56,9 +57,10 @@ namespace vanguard {
             .apiVersion = VK_API_VERSION_1_2,
         };
 
-        const char* validationLayers[] = {
-            "VK_LAYER_KHRONOS_validation"
-        };
+        std::vector<const char*> layers;
+#ifdef VANGUARD_DEBUG
+        layers.push_back("VK_LAYER_KHRONOS_validation");
+#endif
 
         std::vector<const char*> ccExtensions(extensions.size());
         ccExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
@@ -66,8 +68,8 @@ namespace vanguard {
 
         s_instance = vk::raii::Instance(s_context, {
                 .pApplicationInfo = &appInfo,
-                .enabledLayerCount = 0,
-                .ppEnabledLayerNames = validationLayers,
+                .enabledLayerCount = static_cast<uint32_t>(layers.size()),
+                .ppEnabledLayerNames = layers.data(),
                 .enabledExtensionCount = static_cast<uint32_t>(ccExtensions.size()),
                 .ppEnabledExtensionNames = ccExtensions.data(),
         });
@@ -410,5 +412,9 @@ namespace vanguard {
 
     vk::raii::DescriptorPool& Vulkan::getDescriptorPool() {
         return *s_descriptorPool;
+    }
+
+    std::mutex& Vulkan::getVmaMutex() {
+        return s_vmaMutex;
     }
 }

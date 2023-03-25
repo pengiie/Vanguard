@@ -13,6 +13,7 @@
 #include "ImGuiWindow.h"
 #include "graphics/RenderSystem.h"
 #include "Scene.h"
+#include "Scheduler.h"
 
 namespace vanguard {
     class Application : public Singleton {
@@ -35,6 +36,7 @@ namespace vanguard {
         [[nodiscard]] inline Assets& getAssets() { return m_assets; }
         [[nodiscard]] inline Window& getWindow() { return m_window; }
         [[nodiscard]] inline RenderSystem& getRenderSystem() { return m_renderSystem;}
+        [[nodiscard]] inline Scheduler& getScheduler() { return m_scheduler; }
 
         static Application& Get();
     private:
@@ -47,5 +49,6 @@ namespace vanguard {
         Window m_window{};
         ImGuiWindow m_imGuiWindow{};
         RenderSystem m_renderSystem{};
+        Scheduler m_scheduler{};
     };
 }

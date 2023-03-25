@@ -39,7 +39,8 @@ namespace vanguard {
             TIMER("Application::loop");
             Window::pollEvents();
 
-            m_scene->update(m_window.getDeltaTime());
+            m_scene->update(Window::getDeltaTime());
+            m_scheduler.update();
 
             // Render ImGui
 //            Vulkan::beginImGuiFrame();

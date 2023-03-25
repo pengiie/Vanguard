@@ -17,6 +17,8 @@ namespace vanguard {
         void update(float deltaTime);
 
         [[nodiscard]] inline BufferRef getCameraBuffer() const { return m_cameraBuffer; }
+        [[nodiscard]] inline const glm::vec3& getPosition() const { return m_position; }
+        [[nodiscard]] inline const glm::vec3& getRotation() const { return m_rotation; }
     private:
         BufferRef m_cameraBuffer;
         CameraData m_data;

@@ -45,6 +45,6 @@ namespace vanguard {
     };
 
     struct TerrainVoxel {
-        TerrainVoxelType type;
+        TerrainVoxelType type = TerrainVoxelType::Air;
     };
 }
