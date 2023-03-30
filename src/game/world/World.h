@@ -13,7 +13,7 @@ namespace vanguard {
 
         [[nodiscard]] std::vector<ChunkMesh*> getRenderableChunks(const Camera& camera) const;
     private:
-        int m_renderDistance = 10;
+        int m_renderDistance = 14;
         int m_loadingDistance = m_renderDistance + 1;
 
         ChunkManager m_chunkManager;

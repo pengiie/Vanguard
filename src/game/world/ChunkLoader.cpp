@@ -4,6 +4,8 @@
 #include "../../Application.h"
 #include "Direction.h"
 
+#include <glm/ext.hpp>
+
 namespace vanguard {
 
     void ChunkLoader::init(const glm::ivec3* cameraPosition) {
@@ -72,6 +74,15 @@ namespace vanguard {
     void ChunkLoader::update(ChunkManager& chunkManager, const Camera& camera, int renderDistance, int loadingDistance) {
         FTIMER();
         auto chunks = chunkManager.getOctree().getChunksInFrustum(camera.getFrustum());
+
+        auto cameraChunkPosition = glm::floor(camera.getPosition() / (float) CHUNK_SIZE);
+
+        // Sort chunks by distance to camera
+        std::sort(chunks.begin(), chunks.end(), [this, cameraChunkPosition](const auto& a, const auto& b) {
+            return glm::distance(glm::vec3(a->getPosition()), cameraChunkPosition) < glm::distance(glm::vec3(b->getPosition()), cameraChunkPosition);
+        });
+
+        uint32_t loadCount = 0;
         for(auto& chunk: chunks) {
             auto& pos = chunk->getPosition();
             auto distance = pos - glm::ivec3(0);
@@ -81,7 +92,10 @@ namespace vanguard {
                 continue;
 
             if(!m_chunkJobs.contains(pos)) {
-                tryLoadChunk(chunkManager, pos);
+                if(tryLoadChunk(chunkManager, pos))
+                    loadCount++;
+                if(loadCount >= 32)
+                    break;
             }
         }
         std::vector<glm::ivec3> chunksToDequeMeshing;
@@ -116,7 +130,7 @@ namespace vanguard {
                 toRemove.push_back(position);
 
                 jobsProcessed++;
-                if(jobsProcessed >= 64)
+                if(jobsProcessed >= 128)
                     break;
             }
         }
@@ -125,7 +139,7 @@ namespace vanguard {
             m_chunkJobs.erase(position);
         }
 
-        for (int i = 0; i < 72; i++) {
+        for (int i = 0; i < 32; i++) {
             if(m_pendingChunks.empty())
                 break;
 
