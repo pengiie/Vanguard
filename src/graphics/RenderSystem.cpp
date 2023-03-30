@@ -26,15 +26,7 @@ namespace vanguard {
             });
         }
 
-        // Allocate 25.6 mb for staging buffer
-        m_stagingBuffer = createBuffer(25600000, vk::BufferUsageFlagBits::eTransferSrc, VMA_MEMORY_USAGE_CPU_TO_GPU, false);
-        m_stagingCommandPool = device.createCommandPool({
-            .queueFamilyIndex = Vulkan::getQueueFamilyIndex(),
-        });
-        auto commandBuffers = device.allocateCommandBuffers({ .commandPool = **m_stagingCommandPool, .level = vk::CommandBufferLevel::ePrimary, .commandBufferCount = 1 });
-        m_stagingCommandBuffer = std::move(commandBuffers.at(0));
-
-        m_bufferDestroyQueue.resize(FRAMES_IN_FLIGHT);
+        m_resourceManager.init();
     }
 
     void RenderSystem::bake(RenderGraphBuilder&& builder) {
@@ -142,7 +134,7 @@ namespace vanguard {
                 for (const auto& resource: uniformResources) {
                     UniformInfo uniformInfo = reinterpret_cast<UniformResource*>(m_renderGraphBuilder.m_resources[resource].get())->info;
                     if(uniformInfo.frequency == frequency) {
-                        AllocatedBuffer& buffer = getBuffer(uniformInfo.buffer, j);
+                        const AllocatedBuffer& buffer = m_resourceManager.getBuffer(uniformInfo.buffer.getForFrame(j));
                         bufferInfos.emplace_back(uniformInfo.binding, vk::DescriptorBufferInfo{
                                 .buffer = *buffer.buffer,
                                 .offset = 0,
@@ -234,6 +226,10 @@ namespace vanguard {
         m_renderGraph->addCommand(command);
     }
 
+    void RenderSystem::beginFrame() {
+        m_resourceManager.begin();
+    }
+
     void RenderSystem::render(Window& window) {
         auto& device = Vulkan::getDevice();
         auto& frameData = m_frameData[m_currentFrame];
@@ -245,14 +241,6 @@ namespace vanguard {
                 throw std::runtime_error("Failed to wait for fence");
             }
             device.resetFences({*frameData.inFlightFence});
-        }
-
-        {
-            TIMER("RenderSystem::bufferDestroyQueue");
-            for (BufferRef ref: m_bufferDestroyQueue[m_currentFrame]) {
-                destroyBuffer(ref);
-            }
-            m_bufferDestroyQueue[m_currentFrame].clear();
         }
 
         uint32_t imageIndex;
@@ -273,21 +261,8 @@ namespace vanguard {
         auto& frame = m_frameData[m_currentFrame];
         frame.commandPool.reset();
 
-        // Execute context functions
-        {
-            TIMER("RenderSystem::contextFunctions");
-            frame.contextCommandBuffer.begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
-            for (const auto& func: m_contextFunctions) {
-                TIMER("RenderSystem::contextFunctionIteration");
-                func(frame.contextCommandBuffer);
-            }
-            m_contextFunctions.clear();
-            frame.contextCommandBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eTransfer, vk::PipelineStageFlagBits::eBottomOfPipe, {}, {}, {}, {});
-            frame.contextCommandBuffer.end();
-        }
         // Transition swapchain image to transfer destination
         {
-            TIMER("RenderSystem::recordSwapchainImageTransision");
             frame.swapchainImageTransitionCommandBuffer.begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
             frame.swapchainImageTransitionCommandBuffer.pipelineBarrier(vk::PipelineStageFlagBits::eTopOfPipe, vk::PipelineStageFlagBits::eBottomOfPipe, {}, {}, {}, std::vector<vk::ImageMemoryBarrier>{
                     vk::ImageMemoryBarrier{
@@ -313,17 +288,14 @@ namespace vanguard {
         // Execute the render graph
         {
             {
-                TIMER("RenderSystem::recordRenderGraph");
                 frame.renderCommandBuffer.begin({ .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit });
                 m_renderGraph->execute(frame.renderCommandBuffer, m_currentFrame);
                 frame.renderCommandBuffer.end();
             }
 
-            TIMER("RenderSystem::submitFirstQueue");
-
             vk::CommandBuffer commandBuffers[] = {
+                    m_resourceManager.bakeStagingCommandBuffer(),
                     *frame.swapchainImageTransitionCommandBuffer,
-                    *frame.contextCommandBuffer,
                     *frame.renderCommandBuffer,
             };
             vk::PipelineStageFlags waitFlags = vk::PipelineStageFlagBits::eColorAttachmentOutput;
@@ -340,7 +312,6 @@ namespace vanguard {
 
         // Blit the backbuffer image to swapchain image and transition the swapchain image to present
         {
-            TIMER("RenderSystem::recordBlitCommandBuffer");
             {
                 vk::Offset3D zeroOffset{0, 0, 0};
                 vk::Offset3D windowSizeOffset{static_cast<int32_t>(window.getWidth()),
@@ -388,7 +359,6 @@ namespace vanguard {
 
                 frame.blitCommandBuffer.end();
             }
-            TIMER("RenderSystem::submitBlitQueue");
 
             vk::PipelineStageFlags waitFlags = vk::PipelineStageFlagBits::eTransfer;
             Vulkan::getQueue().submit({vk::SubmitInfo{
@@ -421,118 +391,5 @@ namespace vanguard {
 
         m_currentFrame = (m_currentFrame + 1) % FRAMES_IN_FLIGHT;
         m_frameCount++;
-    }
-
-    static AllocatedBuffer allocateBufferStruct(size_t allocationSize, vk::BufferUsageFlags usage, VmaMemoryUsage memoryUsage) {
-        vk::raii::Buffer buffer = Vulkan::getDevice().createBuffer({
-            .size = allocationSize,
-            .usage = usage,
-        });
-        VmaAllocationCreateInfo allocInfo = {
-            .usage = memoryUsage,
-        };
-
-        Allocation allocation;
-        vmaAllocateMemoryForBuffer(*Vulkan::getAllocator(), static_cast<VkBuffer>(*buffer), &allocInfo, &allocation.allocation, &allocation.allocationInfo);
-        vmaBindBufferMemory(*Vulkan::getAllocator(), allocation.allocation, static_cast<VkBuffer>(*buffer));
-
-        return AllocatedBuffer{
-            .buffer = std::move(buffer),
-            .allocation = std::move(allocation),
-            .bufferSize = allocationSize
-        };
-    }
-
-    BufferRef RenderSystem::createBuffer(size_t allocationSize, vk::BufferUsageFlags usage,
-                                         VmaMemoryUsage memoryUsage, bool perFrame) {
-        std::lock_guard lock(m_bufferMutex);
-        return createBufferInternal(allocationSize, usage, memoryUsage, perFrame);
-    }
-
-    BufferRef RenderSystem::createBufferInternal(size_t allocationSize, vk::BufferUsageFlags usage,
-                                                 VmaMemoryUsage memoryUsage, bool perFrame) {
-        FTIMER();
-        uint32_t index;
-        usage |= vk::BufferUsageFlagBits::eTransferDst;
-        if (perFrame) {
-            index = m_perFrameBufferIndex++;
-
-            for (int i = 0; i < FRAMES_IN_FLIGHT; i++) {
-                if(m_frameData[i].buffers.size() != index)
-                    throw std::runtime_error("Size mismatch for per frame buffers");
-                m_frameData[i].buffers.emplace(index, allocateBufferStruct(allocationSize, usage, memoryUsage));
-            }
-        } else {
-            index = m_localBufferIndex++;
-            m_buffers.emplace(index, allocateBufferStruct(allocationSize, usage, memoryUsage));
-        }
-        BufferRef ref = m_bufferIndex++;
-        m_bufferReferences.emplace(ref, std::pair<bool, uint32_t>{perFrame, index});
-
-        return ref;
-    }
-
-    BufferRef RenderSystem::createUniformBuffer(size_t allocationSize) {
-        return createBuffer(allocationSize, vk::BufferUsageFlagBits::eUniformBuffer, VMA_MEMORY_USAGE_GPU_ONLY, true);
-    }
-
-    void RenderSystem::updateBufferInternal(vanguard::AllocatedBuffer& buffer, const void* data, size_t size) {
-        FTIMER();
-        std::lock_guard lock(m_bufferMutex);
-        BufferRef stagingBufferRef = createBufferInternal(25600000, vk::BufferUsageFlagBits::eTransferSrc, VMA_MEMORY_USAGE_CPU_TO_GPU, false);
-        AllocatedBuffer& stagingBuffer = getBufferInternal(stagingBufferRef, m_currentFrame);
-        if(stagingBuffer.allocation.allocationInfo.size < size)
-            throw std::runtime_error("Staging buffer too small");
-        auto vkBuffer = *buffer.buffer;
-
-        m_contextFunctions.emplace_back([this, vkBuffer, stagingBufferRef, data, size](vk::raii::CommandBuffer& commandBuffer) {
-            TIMER("RenderSystem::updateBufferInternal::contextFunction");
-            std::lock_guard lock(m_bufferMutex);
-            AllocatedBuffer& stagingBuffer = getBufferInternal(stagingBufferRef, m_currentFrame);
-            {
-                std::lock_guard vmaLock(Vulkan::getVmaMutex());
-                void* mappedData;
-                vmaMapMemory(*Vulkan::getAllocator(), stagingBuffer.allocation.allocation, &mappedData);
-                memcpy(mappedData, data, size);
-                vmaUnmapMemory(*Vulkan::getAllocator(), stagingBuffer.allocation.allocation);
-                commandBuffer.copyBuffer(*stagingBuffer.buffer, vkBuffer, {vk::BufferCopy{.size = size}});
-            }
-            m_bufferDestroyQueue[m_currentFrame].push_back(stagingBufferRef);
-        });
-    }
-
-    void RenderSystem::updateBuffer(BufferRef bufferReference, const void* data, size_t size, bool perFrame) {
-        if(!perFrame) {
-            for(int i = 0; i < FRAMES_IN_FLIGHT; i++) {
-                updateBufferInternal(getBuffer(bufferReference, i), data, size);
-            }
-        } else {
-            updateBufferInternal(getBuffer(bufferReference, m_currentFrame), data, size);
-        }
-    }
-
-    AllocatedBuffer& RenderSystem::getBuffer(BufferRef bufferReference, uint32_t frameIndex) {
-        std::lock_guard lock(m_bufferMutex);
-        return getBufferInternal(bufferReference, frameIndex);
-    }
-
-    AllocatedBuffer& RenderSystem::getBufferInternal(vanguard::BufferRef bufferReference, uint32_t frameIndex) {
-        auto [perFrame, index] = m_bufferReferences[bufferReference];
-        return perFrame ? m_frameData[frameIndex].buffers.at(index) : m_buffers.at(index);
-    }
-
-    void RenderSystem::destroyBuffer(BufferRef bufferReference) {
-        std::lock_guard lock(m_bufferMutex);
-        std::lock_guard vmaLock(Vulkan::getVmaMutex());
-        auto [perFrame, index] = m_bufferReferences[bufferReference];
-        if(perFrame) {
-            for(int i = 0; i < FRAMES_IN_FLIGHT; i++) {
-                m_frameData[i].buffers.erase(index);
-            }
-        } else {
-            m_buffers.erase(index);
-        }
-        m_bufferReferences.erase(bufferReference);
-
     }
 }

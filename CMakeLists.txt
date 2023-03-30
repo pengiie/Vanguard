@@ -33,10 +33,10 @@ set(VANGUARD_FILES
         src/graphics/RenderSystem.h
         src/assets/SpirVShader.h
         src/Scene.h
-        src/world/WorldScene.cpp
-        src/world/WorldScene.h
-        src/world/Camera.cpp
-        src/world/Camera.h)
+        src/game/GameScene.cpp
+        src/game/GameScene.h
+        src/game/Camera.cpp
+        src/game/Camera.h)
 
 set(IMGUI_DIR ext/imgui)
 set(IMGUI_FILES
@@ -52,7 +52,7 @@ set(IMGUI_FILES
         ${IMGUI_DIR}/imgui_tables.cpp
         ${IMGUI_DIR}/imgui_widgets.cpp
         ${IMGUI_DIR}/backends/imgui_impl_glfw.cpp
-        ${IMGUI_DIR}/backends/imgui_impl_vulkan.cpp src/world/terrain/Terrain.cpp src/world/terrain/Terrain.h src/world/terrain/Chunk.cpp src/world/terrain/Chunk.h src/world/terrain/Voxel.h src/world/terrain/Voxel.cpp src/world/terrain/TerrainConstants.h src/world/terrain/TerrainGenerator.cpp src/world/terrain/TerrainGenerator.h src/Scheduler.cpp src/Scheduler.h)
+        ${IMGUI_DIR}/backends/imgui_impl_vulkan.cpp src/Scheduler.cpp src/Scheduler.h src/graphics/ResourceManager.cpp src/graphics/ResourceManager.h src/game/world/World.cpp src/game/world/World.h src/game/world/ChunkManager.cpp src/game/world/ChunkManager.h src/game/world/Chunk.cpp src/game/world/Chunk.h src/game/world/WorldGenerator.cpp src/game/world/WorldGenerator.h src/game/world/Direction.h src/game/world/ChunkLoader.cpp src/game/world/ChunkLoader.h src/game/world/Voxel.h src/util/Hash.h src/util/Frustum.h src/util/AABB.h)
 set(ETC_FILES
         ext/perlin/PerlinNoise.hpp)
 
@@ -91,7 +91,7 @@ endif()
 
 # Target Vulkan SDK for VMA since it's required for building
 target_include_directories(VulkanMemoryAllocator PRIVATE ${VULKAN_SDK_INCLUDE})
-target_link_libraries(VulkanMemoryAllocator ${VULKAN_LIB})
+#target_link_libraries(VulkanMemoryAllocator ${VULKAN_LIB})
 
 # Include imgui
 target_include_directories(vanguard PRIVATE ext/imgui)

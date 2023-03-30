@@ -2,11 +2,11 @@
 
 #include "../Config.h"
 #include "Allocator.h"
+#include "ResourceManager.h"
 #include <functional>
 #include <vulkan/vulkan_raii.hpp>
 
 namespace vanguard {
-    typedef uint32_t BufferRef;
     typedef uint32_t ResourceRef;
     typedef uint32_t RenderPassRef;
     #define UNDEFINED_REFERENCE UINT32_MAX
@@ -47,7 +47,7 @@ namespace vanguard {
     };
 
     struct UniformInfo {
-        BufferRef buffer = UNDEFINED_REFERENCE;
+        UniformBuffer buffer;
         UniformFrequency frequency = UniformFrequency::PerFrame;
         uint32_t binding = 0;
     };
@@ -64,6 +64,7 @@ namespace vanguard {
     };
     class VertexInputData {
     public:
+        VertexInputData() = default;
         explicit VertexInputData(uint32_t size) : m_stride(size) {}
 
         void setAttribute(uint32_t location, uint32_t offset, vk::Format format) {

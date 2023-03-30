@@ -1,15 +1,13 @@
-#include "WorldScene.h"
+#include "GameScene.h"
 
 #include "../Application.h"
-#include "terrain/Terrain.h"
-#include "terrain/Voxel.h"
 
 namespace vanguard {
-    void WorldScene::init() {
+    void GameScene::init() {
         loadAssets(Application::Get().getAssets());
 
         m_camera.init();
-        m_terrain.init(&m_camera);
+        m_world.init();
 
         Application::Get().getScheduler().scheduleRepeatingTask([&] {
             uint32_t currentFrameCount = Application::Get().getRenderSystem().getFrameCount();
@@ -21,12 +19,12 @@ namespace vanguard {
         Application::Get().getAssets().finishLoading();
     }
 
-    void WorldScene::loadAssets(Assets& assets) {
+    void GameScene::loadAssets(Assets& assets) {
         assets.load("assets/shaders/gbuffer.vert.glsl");
         assets.load("assets/shaders/gbuffer.frag.glsl");
     }
 
-    void WorldScene::update(float deltaTime) {
+    void GameScene::update(float deltaTime) {
         FTIMER();
         if(Input::isKeyPressed(Key::Escape)) {
             Application::Get().stop();
@@ -36,21 +34,16 @@ namespace vanguard {
         }
 
         m_camera.update(deltaTime);
-        m_terrain.update(m_camera.getPosition());
+        m_world.update(m_camera);
     }
 
-    void WorldScene::buildRenderGraph(RenderGraphBuilder& builder) {
+    void GameScene::buildRenderGraph(RenderGraphBuilder& builder) {
         auto& assets = Application::Get().getAssets();
 
         const ResourceRef cameraUniform = builder.createUniform("CameraUniform", {
             .buffer = m_camera.getCameraBuffer(),
             .frequency = UniformFrequency::PerFrame,
             .binding = 0
-        });
-        const ResourceRef terrainColorPalette = builder.createUniform("TerrainColorPaletteUniform", {
-            .buffer = m_terrain.getTerrainColorPaletteBuffer(),
-            .frequency = UniformFrequency::PerFrame,
-            .binding = 1
         });
         const ResourceRef diffuse = builder.createImage("GBufferDiffuse", { .format = vk::Format::eR8G8B8A8Unorm });
         const ResourceRef gBufferStencil = builder.createStencil("GBufferStencil", { .format = vk::Format::eD24UnormS8Uint });
@@ -60,29 +53,19 @@ namespace vanguard {
             .name = "TerrainGBuffer",
             .inputs = {
                 cameraUniform,
-                terrainColorPalette
             },
             .outputs = {
                 diffuse,
                 gBufferStencil
             },
-            .vertexInput = TerrainVoxelVertex::getVertexInputData(),
+            .vertexInput = VoxelVertex::getVertexInputData(),
             .clearColor = { 0.0f, 1.0f, 1.0f, 1.0f },
             .vertexShader = assets.get<SpirVShaderCode>("assets/shaders/gbuffer.vert.glsl"),
             .fragmentShader = assets.get<SpirVShaderCode>("assets/shaders/gbuffer.frag.glsl"),
             .execution = [this](const vk::CommandBuffer& cmd, uint32_t frameIndex) {
-                std::lock_guard regLock(m_registryMutex);
-                auto view = m_registry.view<const Chunk>();
-                view.each([&](const entt::entity& entity, const Chunk& chunk) {
-                    if(chunk.getVoxelBuffer() == UNDEFINED_REFERENCE)
-                        return;
-
-                    std::lock_guard lock(Application::Get().getRenderSystem().getBufferMutex());
-                    auto& buffer = Application::Get().getRenderSystem().getBufferInternal(chunk.getVoxelBuffer(), frameIndex);
-
-                    cmd.bindVertexBuffers(0, *buffer.buffer, { 0 }, {});
-                    cmd.draw(chunk.getVertexCount(), 1, 0, 0);
-                });
+                for (const ChunkMesh* mesh: m_world.getRenderableChunks(m_camera)) {
+                    mesh->render(cmd);
+                }
             }
         });
         builder.setBackBuffer(diffuse);

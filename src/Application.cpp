@@ -3,7 +3,7 @@
 #include "Input.h"
 #include "graphics/Vulkan.h"
 #include "util/Timer.h"
-#include "world/WorldScene.h"
+#include "game/GameScene.h"
 
 namespace vanguard {
     Application* Application::s_instance = nullptr;
@@ -25,7 +25,7 @@ namespace vanguard {
 
         m_renderSystem.init();
 
-        setScene<WorldScene>();
+        setScene<GameScene>();
     }
 
     void Application::run() {
@@ -38,6 +38,8 @@ namespace vanguard {
         while(m_running && !m_window.isCloseRequested()) {
             TIMER("Application::loop");
             Window::pollEvents();
+
+            m_renderSystem.beginFrame();
 
             m_scene->update(Window::getDeltaTime());
             m_scheduler.update();

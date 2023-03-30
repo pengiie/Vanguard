@@ -2,15 +2,15 @@
 
 #include "../Scene.h"
 #include "Camera.h"
+#include "world/World.h"
 #include "../assets/Assets.h"
-#include "terrain/Terrain.h"
 
 #include <mutex>
 
 namespace vanguard {
-    class WorldScene : public Scene {
+    class GameScene : public Scene {
     public:
-        WorldScene() = default;
+        GameScene() = default;
 
         void init() override;
         void update(float deltaTime) override;
@@ -21,8 +21,7 @@ namespace vanguard {
         std::mutex m_registryMutex;
 
         Camera m_camera{};
-
-        Terrain m_terrain = Terrain(m_registry, m_registryMutex);
+        World m_world{};
 
         uint32_t m_lastFrame = 0;
     };
