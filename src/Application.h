@@ -28,8 +28,8 @@ namespace vanguard {
             m_scene = std::make_unique<T>();
             m_scene->init();
 
-            RenderGraphBuilder builder;
-            m_scene->buildRenderGraph(builder);
+            FrameGraphBuilder builder;
+            m_scene->buildFrameGraph(builder);
             m_renderSystem.bake(std::move(builder));
         }
 

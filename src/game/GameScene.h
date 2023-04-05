@@ -14,9 +14,7 @@ namespace vanguard {
 
         void init() override;
         void update(float deltaTime) override;
-        void buildRenderGraph(RenderGraphBuilder& builder) override;
-    private:
-        static void loadAssets(Assets& assets);
+        void buildFrameGraph(FrameGraphBuilder& builder) override;
     private:
         std::mutex m_registryMutex;
 

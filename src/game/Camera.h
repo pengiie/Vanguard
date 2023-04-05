@@ -7,9 +7,13 @@
 
 namespace vanguard {
     struct CameraData {
+        glm::vec4 position;
+        glm::vec4 screenSize;
+
         glm::mat4 view;
         glm::mat4 projection;
         glm::mat4 projView;
+        glm::mat4 screenToWorld;
     };
 
     struct PerspectiveData {
@@ -30,6 +34,7 @@ namespace vanguard {
         [[nodiscard]] inline const Frustum& getFrustum() const { return m_frustum; }
     private:
         [[nodiscard]] glm::mat4 createPerspective() const;
+        [[nodiscard]] glm::mat4 createToWorld() const;
         [[nodiscard]] Frustum createFrustum() const;
         [[nodiscard]] glm::vec3 forward() const;
         [[nodiscard]] glm::vec3 right() const;

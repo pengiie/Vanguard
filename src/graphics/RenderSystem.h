@@ -3,7 +3,7 @@
 #include <optional>
 #include "../Config.h"
 #include "../Window.h"
-#include "RenderGraph.h"
+#include "FrameGraph.h"
 #include "ResourceManager.h"
 #include <vulkan/vulkan_raii.hpp>
 
@@ -27,7 +27,7 @@ namespace vanguard {
     class RenderSystem {
     public:
         void init();
-        void bake(RenderGraphBuilder&& builder);
+        void bake(FrameGraphBuilder&& builder);
 
         void beginFrame();
         void render(Window& window);
@@ -36,8 +36,6 @@ namespace vanguard {
         [[nodiscard]] inline uint32_t getFrameIndex() const { return m_currentFrame; }
 
         [[nodiscard]] inline ResourceManager& getResourceManager() { return m_resourceManager; }
-
-        inline void rebake() { bake(std::move(m_renderGraphBuilder)); }
     private:
         std::vector<FrameData> m_frameData{};
         uint32_t m_currentFrame = 0;
@@ -45,8 +43,6 @@ namespace vanguard {
 
         ResourceManager m_resourceManager;
 
-        // Render graph
-        std::unique_ptr<RenderGraph> m_renderGraph;
-        RenderGraphBuilder m_renderGraphBuilder;
+        std::unique_ptr<FrameGraph> m_frameGraph;
     };
 }

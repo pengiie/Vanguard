@@ -28,7 +28,7 @@ namespace vanguard {
         glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
         glfwWindowHint(GLFW_FOCUS_ON_SHOW, GLFW_TRUE);
 
-        m_handle = glfwCreateWindow(1280, 720, WINDOW_NAME, nullptr, nullptr);
+        m_handle = glfwCreateWindow(m_width, m_height, WINDOW_NAME, nullptr, nullptr);
         glfwSetWindowUserPointer(m_handle, this);
 
         glfwSetInputMode(m_handle, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
