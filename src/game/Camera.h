@@ -7,13 +7,13 @@
 
 namespace vanguard {
     struct CameraData {
-        glm::vec4 position;
-        glm::vec4 screenSize;
+        alignas(16) glm::vec3 position;
+        alignas(8) glm::vec2 screenSize;
 
-        glm::mat4 view;
-        glm::mat4 projection;
-        glm::mat4 projView;
-        glm::mat4 screenToWorld;
+        alignas(16) glm::mat4 view;
+        alignas(16) glm::mat4 projection;
+        alignas(16) glm::mat4 projView;
+        alignas(16) glm::mat4 screenToWorld;
     };
 
     struct PerspectiveData {

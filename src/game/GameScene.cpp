@@ -77,7 +77,7 @@ namespace vanguard {
                 mesh->render(cmd);
             }
         };
-        builder.addRenderPass(gBufferPass);
+        //builder.addRenderPass(gBufferPass);
 
         const ResourceRef marchImage = builder.createImage("MarchImage", {
             .format = vk::Format::eR8G8B8A8Unorm,
@@ -92,7 +92,7 @@ namespace vanguard {
         computePass.name = "RayMarchCompute";
         computePass.outputs = { marchImage };
         computePass.computeShader = assets.get<SpirVShaderCode>("shaders/march.comp.glsl");
-        computePass.execution = [this](const vk::CommandBuffer& cmd) {
+        computePass.execution = [](const vk::CommandBuffer& cmd) {
             auto& window = Application::Get().getWindow();
             cmd.dispatch(ceil((float) window.getWidth() / 16.0f), ceil((float) window.getHeight() / 16.0f), 1);
         };

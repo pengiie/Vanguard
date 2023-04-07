@@ -66,8 +66,8 @@ namespace vanguard {
             }
         }
 
-        m_data.position = glm::vec4(m_position, 0.0f);
-        m_data.screenSize = glm::vec4(Application::Get().getWindow().getWidth(), Application::Get().getWindow().getHeight(), 0.0f, 0.0f);
+        m_data.position = m_position;
+        m_data.screenSize = glm::vec2(Application::Get().getWindow().getWidth(), Application::Get().getWindow().getHeight());
         INFO("Screen Size: ({}, {})", m_data.screenSize.x, m_data.screenSize.y);
         m_data.view = glm::lookAt(m_position, m_position + forward(), glm::vec3(0.0f, -1.0f, 0.0f));
         m_data.projView = m_data.projection * m_data.view;
@@ -82,14 +82,14 @@ namespace vanguard {
         return glm::perspective(glm::radians(m_perspectiveData.fov), m_perspectiveData.aspectRatio, m_perspectiveData.nearPlane, m_perspectiveData.farPlane);
     }
 
+    // Convert from -1 to 1 coordinates to world space coordinates on the near planes
     glm::mat4 Camera::createToWorld() const {
-        float nearWidth1_2 = m_perspectiveData.nearPlane * tan(m_perspectiveData.fov / 2);
-        float nearHeight1_2 = nearWidth1_2 / m_perspectiveData.aspectRatio;
-
-        glm::mat4 mat = glm::mat4(1.0f);
-        mat = glm::translate(mat, m_position + forward() * m_perspectiveData.nearPlane);
-        mat = glm::scale(mat, glm::vec3(nearWidth1_2, nearHeight1_2, 1.0f));
-        return mat;
+        glm::mat4 view = m_data.view;
+        view[3][0] = 0.0f;
+        view[3][1] = 0.0f;
+        view[3][2] = 0.0f;
+        glm::mat4 toWorld = glm::inverse(view) * glm::inverse(m_data.projection);
+        return toWorld;
     }
 
     Frustum Camera::createFrustum() const {

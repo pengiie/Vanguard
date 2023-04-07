@@ -82,9 +82,15 @@ namespace vanguard {
 
         // Define images and stencils
         for (const auto& resource: m_builder.getImageResources()) {
+            if(usageFlags.find(resource.name) == usageFlags.end()) {
+                continue;
+            }
             createImage(resource.name, resource.info, usageFlags.at(resource.name), vk::ImageAspectFlagBits::eColor);
         }
         for (const auto& resource: m_builder.getStencilResources()) {
+            if(usageFlags.find(resource.name) == usageFlags.end()) {
+                continue;
+            }
             createImage(resource.name, resource.info, usageFlags.at(resource.name), vk::ImageAspectFlagBits::eDepth);
         }
 
