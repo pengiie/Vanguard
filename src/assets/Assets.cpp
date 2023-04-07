@@ -17,7 +17,7 @@ namespace vanguard {
     }
 
     void Assets::load(const std::string& filePath) {
-        File file(filePath);
+        File file(toAssetPath(filePath));
 
         m_tasks.emplace(file.path(), std::async(std::launch::async, [this, file]() {
             if(m_assets.find(file.path()) != m_assets.end()) {
@@ -45,5 +45,11 @@ namespace vanguard {
         for (auto& [_, task] : m_tasks) {
             task.wait();
         }
+    }
+
+    void Assets::unload(const std::string& path) {
+        File file(toAssetPath(path));
+
+        m_assets.erase(file.path());
     }
 }

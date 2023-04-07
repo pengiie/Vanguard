@@ -20,7 +20,7 @@ namespace vanguard {
                 .view = glm::mat4(1.0f),
                 .projection = createPerspective()
         };
-        m_position = glm::vec3(0.0f, 0.0f, -1.0f);
+        m_position = glm::vec3(0.0f, 0.0f, 0.0f);
     }
 
     void Camera::update(float deltaTime) {
@@ -66,8 +66,12 @@ namespace vanguard {
             }
         }
 
+        m_data.position = m_position;
+        m_data.screenSize = glm::vec2(Application::Get().getWindow().getWidth(), Application::Get().getWindow().getHeight());
+        INFO("Screen Size: ({}, {})", m_data.screenSize.x, m_data.screenSize.y);
         m_data.view = glm::lookAt(m_position, m_position + forward(), glm::vec3(0.0f, -1.0f, 0.0f));
         m_data.projView = m_data.projection * m_data.view;
+        m_data.screenToWorld = createToWorld();
 
         m_cameraBuffer.update(&m_data, sizeof(CameraData));
 
@@ -78,9 +82,18 @@ namespace vanguard {
         return glm::perspective(glm::radians(m_perspectiveData.fov), m_perspectiveData.aspectRatio, m_perspectiveData.nearPlane, m_perspectiveData.farPlane);
     }
 
+    // Convert from -1 to 1 coordinates to world space coordinates on the near planes
+    glm::mat4 Camera::createToWorld() const {
+        glm::mat4 view = m_data.view;
+        view[3][0] = 0.0f;
+        view[3][1] = 0.0f;
+        view[3][2] = 0.0f;
+        glm::mat4 toWorld = glm::inverse(view) * glm::inverse(m_data.projection);
+        return toWorld;
+    }
+
     Frustum Camera::createFrustum() const {
-        float fov = glm::radians(140.0f);
-        float farWidth1_2 = m_perspectiveData.farPlane * tan(fov / 2);
+        float farWidth1_2 = m_perspectiveData.farPlane * tan(m_perspectiveData.fov / 2);
         float farHeight1_2 = farWidth1_2 / m_perspectiveData.aspectRatio;
         float nearWidth1_2 = m_perspectiveData.nearPlane * (farWidth1_2 / m_perspectiveData.farPlane);
         float nearHeight1_2 = nearWidth1_2 / m_perspectiveData.aspectRatio;

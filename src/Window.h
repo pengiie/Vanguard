@@ -35,7 +35,7 @@ namespace vanguard {
         [[nodiscard]] static std::vector<std::string> getRequiredExtensions() ;
     private:
         GLFWwindow* m_handle = nullptr;
-        uint32_t m_width = 0;
-        uint32_t m_height = 0;
+        uint32_t m_width = 1280;
+        uint32_t m_height = 720;
     };
 }

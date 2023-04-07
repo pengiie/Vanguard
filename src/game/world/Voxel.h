@@ -1,7 +1,7 @@
 #pragma once
 
 #include "glm/vec3.hpp"
-#include "../../graphics/RenderGraph.h"
+#include "../../graphics/FrameGraph.h"
 
 #define VOXEL_SIZE 1.0f
 

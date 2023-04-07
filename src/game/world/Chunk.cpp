@@ -93,7 +93,6 @@ namespace vanguard {
 
     void ChunkMesh::generateMesh(OctreeNode& node) {
         m_vertices.clear();
-        INFO("Generating mesh for chunk at ({}, {}, {})", node.getPosition().x, node.getPosition().y, node.getPosition().z);
         if(m_lod == ChunkLod::CHUNK_LOD_0) {
             ChunkData& chunkData = node.chunkData; // Since LOD is 0, we can assume that the chunk is a leaf node
 

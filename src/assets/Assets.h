@@ -21,15 +21,23 @@ namespace vanguard {
         void addLoader(const std::string& extension, const std::function<Asset(const File&)>& loader);
 
         void load(const std::string& path);
+        void unload(const std::string& path);
         void finishLoading();
 
         template<typename T>
         [[nodiscard]] const T& get(const std::string& path) {
-            File file(path);
+            File file(toAssetPath(path));
 
             if(m_assets.find(file.path()) == m_assets.end())
                 ERROR("Asset not loaded: {}", file.path());
             return m_assets.at(file.path()).get<T>();
+        }
+    private:
+        static std::string toAssetPath(const std::string& path) {
+            #ifdef VANGUARD_DEBUG
+            return "../assets/" + path;
+            #endif
+            return "assets/" + path;
         }
     private:
         std::unordered_map<std::string, std::function<Asset(const File&)>> m_loaders;

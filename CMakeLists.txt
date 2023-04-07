@@ -27,8 +27,6 @@ set(VANGUARD_FILES
         src/graphics/Allocator.h
         src/ImGuiWindow.cpp
         src/ImGuiWindow.h
-        src/graphics/RenderGraph.h
-        src/graphics/RenderGraph.cpp
         src/graphics/RenderSystem.cpp
         src/graphics/RenderSystem.h
         src/assets/SpirVShader.h
@@ -52,7 +50,7 @@ set(IMGUI_FILES
         ${IMGUI_DIR}/imgui_tables.cpp
         ${IMGUI_DIR}/imgui_widgets.cpp
         ${IMGUI_DIR}/backends/imgui_impl_glfw.cpp
-        ${IMGUI_DIR}/backends/imgui_impl_vulkan.cpp src/Scheduler.cpp src/Scheduler.h src/graphics/ResourceManager.cpp src/graphics/ResourceManager.h src/game/world/World.cpp src/game/world/World.h src/game/world/ChunkManager.cpp src/game/world/ChunkManager.h src/game/world/Chunk.cpp src/game/world/Chunk.h src/game/world/WorldGenerator.cpp src/game/world/WorldGenerator.h src/game/world/Direction.h src/game/world/ChunkLoader.cpp src/game/world/ChunkLoader.h src/game/world/Voxel.h src/util/Hash.h src/util/Frustum.h src/util/AABB.h)
+        ${IMGUI_DIR}/backends/imgui_impl_vulkan.cpp src/Scheduler.cpp src/Scheduler.h src/graphics/ResourceManager.cpp src/graphics/ResourceManager.h src/game/world/World.cpp src/game/world/World.h src/game/world/ChunkManager.cpp src/game/world/ChunkManager.h src/game/world/Chunk.cpp src/game/world/Chunk.h src/game/world/WorldGenerator.cpp src/game/world/WorldGenerator.h src/game/world/Direction.h src/game/world/ChunkLoader.cpp src/game/world/ChunkLoader.h src/game/world/Voxel.h src/util/Hash.h src/util/Frustum.h src/util/AABB.h src/graphics/FrameGraphBuilder.cpp src/graphics/FrameGraphBuilder.h src/graphics/FrameGraph.cpp src/graphics/FrameGraph.h)
 set(ETC_FILES
         ext/perlin/PerlinNoise.hpp)
 
