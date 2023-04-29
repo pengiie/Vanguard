@@ -39,6 +39,8 @@ namespace vanguard {
         Allocation() = default;
         ~Allocation() {
             vmaFreeMemory(*Vulkan::getAllocator(), allocation);
+            allocation = nullptr;
+            allocationInfo = {};
         }
 
         Allocation(const Allocation&) = delete;

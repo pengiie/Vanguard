@@ -2,8 +2,10 @@
 
 #include "../Scene.h"
 #include "Camera.h"
-#include "world/World.h"
 #include "../assets/Assets.h"
+#include "../graphics/FrameGraph.h"
+#include "../assets/Mesh.h"
+#include "Skybox.h"
 
 #include <mutex>
 
@@ -14,12 +16,16 @@ namespace vanguard {
 
         void init() override;
         void update(float deltaTime) override;
-        void buildFrameGraph(FrameGraphBuilder& builder) override;
+        CommandsInfo buildCommands() override;
     private:
-        std::mutex m_registryMutex;
-
+        FrameGraph m_frameGraph;
         Camera m_camera{};
-        World m_world{};
+
+        VertexBuffer m_vb{};
+        uint32_t m_vbc = 0;
+        Texture2D m_texture{};
+
+        Skybox m_skybox{};
 
         uint32_t m_lastFrame = 0;
     };

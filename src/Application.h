@@ -15,6 +15,10 @@
 #include "Scene.h"
 #include "Scheduler.h"
 
+#define APPLICATION vanguard::Application::Get()
+#define RENDER_SYSTEM APPLICATION.getRenderSystem()
+#define ASSETS APPLICATION.getAssets()
+
 namespace vanguard {
     class Application : public Singleton {
     public:
@@ -27,10 +31,7 @@ namespace vanguard {
         void setScene() {
             m_scene = std::make_unique<T>();
             m_scene->init();
-
-            FrameGraphBuilder builder;
-            m_scene->buildFrameGraph(builder);
-            m_renderSystem.bake(std::move(builder));
+            m_renderSystem.bakeCommands(m_scene->buildCommands());
         }
 
         [[nodiscard]] inline Assets& getAssets() { return m_assets; }

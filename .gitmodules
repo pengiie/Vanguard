@@ -19,3 +19,6 @@
 [submodule "ext/vma"]
 	path = ext/vma
 	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
+[submodule "ext/assimp"]
+	path = ext/assimp
+	url = https://github.com/assimp/assimp.git

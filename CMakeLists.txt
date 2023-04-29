@@ -34,7 +34,7 @@ set(VANGUARD_FILES
         src/game/GameScene.cpp
         src/game/GameScene.h
         src/game/Camera.cpp
-        src/game/Camera.h)
+        src/game/Camera.h src/graphics/FrameGraph.h src/graphics/FrameGraph.cpp)
 
 set(IMGUI_DIR ext/imgui)
 set(IMGUI_FILES
@@ -50,7 +50,7 @@ set(IMGUI_FILES
         ${IMGUI_DIR}/imgui_tables.cpp
         ${IMGUI_DIR}/imgui_widgets.cpp
         ${IMGUI_DIR}/backends/imgui_impl_glfw.cpp
-        ${IMGUI_DIR}/backends/imgui_impl_vulkan.cpp src/Scheduler.cpp src/Scheduler.h src/graphics/ResourceManager.cpp src/graphics/ResourceManager.h src/game/world/World.cpp src/game/world/World.h src/game/world/ChunkManager.cpp src/game/world/ChunkManager.h src/game/world/Chunk.cpp src/game/world/Chunk.h src/game/world/WorldGenerator.cpp src/game/world/WorldGenerator.h src/game/world/Direction.h src/game/world/ChunkLoader.cpp src/game/world/ChunkLoader.h src/game/world/Voxel.h src/util/Hash.h src/util/Frustum.h src/util/AABB.h src/graphics/FrameGraphBuilder.cpp src/graphics/FrameGraphBuilder.h src/graphics/FrameGraph.cpp src/graphics/FrameGraph.h)
+        ${IMGUI_DIR}/backends/imgui_impl_vulkan.cpp src/Scheduler.cpp src/Scheduler.h src/graphics/ResourceManager.cpp src/graphics/ResourceManager.h src/util/Hash.h src/util/Frustum.h src/util/AABB.h src/graphics/VertexInput.h src/util/TypeTraits.h src/graphics/Stager.cpp src/graphics/Stager.h src/graphics/Buffer.h src/assets/Mesh.h src/graphics/Texture.h src/assets/TextureData.h src/game/Skybox.cpp src/game/Skybox.h)
 set(ETC_FILES
         ext/perlin/PerlinNoise.hpp)
 
@@ -71,6 +71,8 @@ add_subdirectory(ext/glfw)
 add_subdirectory(ext/vma)
 add_subdirectory(ext/glm)
 add_subdirectory(ext/entt)
+add_subdirectory(ext/assimp)
+add_subdirectory(ext/stb)
 
 # Load Vulkan SDK from system environment variable
 set(VULKAN_SDK $ENV{VULKAN_SDK})
@@ -99,4 +101,4 @@ target_include_directories(vanguard PRIVATE ext/perlin)
 
 # Link external libraries to vanguard
 target_include_directories(vanguard PRIVATE ${VULKAN_SDK_INCLUDE})
-target_link_libraries(vanguard PRIVATE spdlog::spdlog glfw ${VULKAN_LIB} ${SHADERC_LIB} VulkanMemoryAllocator EnTT::EnTT glm::glm)
+target_link_libraries(vanguard PRIVATE spdlog::spdlog glfw ${VULKAN_LIB} ${SHADERC_LIB} VulkanMemoryAllocator EnTT::EnTT glm::glm assimp::assimp stb)

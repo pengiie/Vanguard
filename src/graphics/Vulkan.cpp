@@ -63,8 +63,10 @@ namespace vanguard {
 #endif
 
         std::vector<const char*> ccExtensions(extensions.size());
-        ccExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
         std::transform(extensions.begin(), extensions.end(), ccExtensions.begin(), [](const std::string& str) { return str.c_str(); });
+#ifdef VANGUARD_DEBUG
+        ccExtensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+#endif
 
         s_instance = vk::raii::Instance(s_context, {
                 .pApplicationInfo = &appInfo,
@@ -74,11 +76,13 @@ namespace vanguard {
                 .ppEnabledExtensionNames = ccExtensions.data(),
         });
 
+#ifdef VANGUARD_DEBUG
         s_debugMessenger = s_instance->createDebugUtilsMessengerEXT(vk::DebugUtilsMessengerCreateInfoEXT{
             .messageSeverity = vk::DebugUtilsMessageSeverityFlagBitsEXT::eVerbose | vk::DebugUtilsMessageSeverityFlagBitsEXT::eInfo | vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning | vk::DebugUtilsMessageSeverityFlagBitsEXT::eError,
             .messageType = vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance,
             .pfnUserCallback = debugMessengerFunc,
         });
+#endif
 
         auto physicalDevices = s_instance->enumeratePhysicalDevices();
         for (const auto& item: physicalDevices) {
@@ -101,8 +105,16 @@ namespace vanguard {
         }
 
         std::vector<const char*> deviceExtensions = {
-            VK_KHR_SWAPCHAIN_EXTENSION_NAME
+            VK_KHR_SWAPCHAIN_EXTENSION_NAME,
         };
+
+        for (const auto& extension: deviceExtensions) {
+            if (!s_physicalDevice->enumerateDeviceExtensionProperties(std::string(extension)).empty()) {
+                ERROR("Device extension not found: {}", extension);
+                throw std::runtime_error("Unsupported GPU, missing device extension.");
+            }
+        }
+
         float queuePriority = 1.0f;
         vk::DeviceQueueCreateInfo deviceQueueCreateInfo{
             .queueFamilyIndex = s_queueFamilyIndex,
@@ -165,6 +177,7 @@ namespace vanguard {
                 break;
             }
         }
+      //  presentMode = vk::PresentModeKHR::eImmediate;
 
 
         s_swapchainExtent = vk::Extent2D{ width, height };
@@ -416,5 +429,29 @@ namespace vanguard {
 
     std::mutex& Vulkan::getVmaMutex() {
         return s_vmaMutex;
+    }
+
+    vk::Format Vulkan::getDepthFormat() {
+        std::vector<vk::Format> depthFormats = {
+                vk::Format::eD32Sfloat,
+                vk::Format::eD32SfloatS8Uint,
+                vk::Format::eD24UnormS8Uint
+        };
+        for (vk::Format format: depthFormats) {
+            auto props = s_physicalDevice->getFormatProperties(format);
+            if(props.optimalTilingFeatures & vk::FormatFeatureFlagBits::eDepthStencilAttachment)
+                return format;
+        }
+
+       throw std::runtime_error("Failed to find supported depth format!");
+    }
+
+    uint32_t Vulkan::padUniformBufferSize(uint32_t originalSize) {
+        auto minUboAlignment = s_physicalDevice->getProperties().limits.minUniformBufferOffsetAlignment;
+        auto alignedSize = originalSize;
+        if (minUboAlignment > 0) {
+            alignedSize = (alignedSize + minUboAlignment - 1) & ~(minUboAlignment - 1);
+        }
+        return alignedSize;
     }
 }

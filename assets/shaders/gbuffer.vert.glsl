@@ -1,20 +1,30 @@
 #version 450 core
 
-layout(location = 0) in vec3 vertices;
-layout(location = 1) in float shading;
+layout(location = 0) in vec3 position;
+layout(location = 1) in vec3 normal;
+layout(location = 2) in vec2 uv;
 
-layout(set = 0, binding = 0) uniform CameraUniform{
+layout(location = 0) out vec3 p_normal;
+layout(location = 1) out vec2 p_uv;
+layout(location = 2) out vec3 p_position;
+
+layout(set = 0, binding = 0, std140) uniform CameraUniform{
+    vec3 position;
+    vec2 screenSize;
+
     mat4 view;
     mat4 projection;
     mat4 viewProj;
+    mat4 toWorld;
 } u_camera;
 
-flat layout(location = 0) out uint pass_colorIndex;
-flat layout(location = 1) out float pass_shading;
+const mat3 transform = mat3(100.0, 0.0,  0.0,
+0.0,  100.0, 0.0,
+0.0,  0.0,  100.0);
 
 void main() {
-    gl_Position = u_camera.viewProj * vec4(vertices, 1.0);
-
-    pass_colorIndex = 1;
-    pass_shading = shading;
+    p_position = transform * position;
+    gl_Position = u_camera.viewProj * vec4(p_position, 1.0);
+    p_normal = normal;
+    p_uv = uv;
 }

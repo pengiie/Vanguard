@@ -1,11 +1,24 @@
 #include "GameScene.h"
 
 #include "../Application.h"
+#include "../graphics/FrameGraph.h"
 
 static const std::vector<std::string> assets = {
     "shaders/gbuffer.vert.glsl",
     "shaders/gbuffer.frag.glsl",
-    "shaders/march.comp.glsl"
+    "shaders/skybox.vert.glsl",
+    "shaders/skybox.frag.glsl",
+    "shaders/colormap.comp.glsl",
+    "bunnyuv.obj",
+    "bunnyimg.jpg",
+    "grass.jpg",
+    "skybox/top.jpg",
+    "skybox/bottom.jpg",
+    "skybox/left.jpg",
+    "skybox/right.jpg",
+    "skybox/front.jpg",
+    "skybox/back.jpg",
+  //  "shaders/march.comp.glsl"
 };
 
 namespace vanguard {
@@ -15,7 +28,6 @@ namespace vanguard {
         }
 
         m_camera.init();
-        m_world.init();
 
         Application::Get().getScheduler().scheduleRepeatingTask([&] {
             uint32_t currentFrameCount = Application::Get().getRenderSystem().getFrameCount();
@@ -25,6 +37,25 @@ namespace vanguard {
         }, std::chrono::milliseconds(0), std::chrono::milliseconds(1000));
 
         Application::Get().getAssets().finishLoading();
+
+        auto bunny = Application::Get().getAssets().get<Mesh>("bunnyuv.obj");
+        m_vb.create<Vertex>(bunny.vertices);
+        m_vbc = bunny.vertices.size();
+
+        TextureData test{
+            .width = 2,
+            .height = 2,
+            .channels = 3,
+        };
+        for(int i = 0; i < 4; i++) {
+            test.data.push_back(255);
+            test.data.push_back(0);
+            test.data.push_back(0);
+        }
+
+        m_texture.create(ASSETS.get<TextureData>("bunnyimg.jpg"));
+
+        m_skybox.init();
     }
 
     void GameScene::update(float deltaTime) {
@@ -35,69 +66,51 @@ namespace vanguard {
         if(Input::isKeyPressed(Key::F1)) {
             Application::Get().getWindow().toggleCursor();
         }
-        if(Input::isKeyPressed(Key::F2)) {
-            auto& assetManager = Application::Get().getAssets();
-            assetManager.unload("shaders/march.comp.glsl");
-            assetManager.load("shaders/march.comp.glsl");
-            assetManager.finishLoading();
-
-            FrameGraphBuilder builder;
-            buildFrameGraph(builder);
-            Application::Get().getRenderSystem().bake(std::move(builder));
-        }
 
         m_camera.update(deltaTime);
-        //m_world.update(m_camera);
     }
 
-    void GameScene::buildFrameGraph(FrameGraphBuilder& builder) {
-        auto& assets = Application::Get().getAssets();
+    CommandsInfo GameScene::buildCommands() {
+        FrameGraphBuilder builder;
 
-        const ResourceRef cameraUniform = builder.createUniformBuffer("CameraUniform", {
-            .buffer = m_camera.getCameraBuffer(),
-            .frequency = UniformFrequency::PerFrame,
-            .binding = 0
-        });
-        const ResourceRef diffuse = builder.createImage("GBufferDiffuse", {
-            .format = vk::Format::eR8G8B8A8Unorm,
-            .clearColor = { 0.0f, 1.0f, 1.0f },
-        });
-        const ResourceRef gBufferStencil = builder.createStencil("GBufferStencil", { .format = vk::Format::eD24UnormS8Uint });
+        auto cameraUniform = builder.addUniformBuffer(0, 0, &m_camera.getCameraBuffer());
+        auto textureUniform = builder.addUniformSampledImage(0, 1, &m_texture);
 
-        // GBuffer pass
-        RenderPassInfo gBufferPass{};
-        gBufferPass.name = "TerrainGBuffer";
-        gBufferPass.inputs = { cameraUniform };
-        gBufferPass.outputs = { diffuse, gBufferStencil };
-        gBufferPass.vertexInput = VoxelVertex::getVertexInputData();
-        gBufferPass.vertexShader = assets.get<SpirVShaderCode>("shaders/gbuffer.vert.glsl");
-        gBufferPass.fragmentShader = assets.get<SpirVShaderCode>("shaders/gbuffer.frag.glsl");
-        gBufferPass.execution = [this](const vk::CommandBuffer& cmd) {
-            for (const ChunkMesh* mesh : m_world.getRenderableChunks(m_camera)) {
-                mesh->render(cmd);
-            }
-        };
-        //builder.addRenderPass(gBufferPass);
+        auto sceneImage = builder.createImage();
+        auto depth = builder.createDepthStencil();
 
-        const ResourceRef marchImage = builder.createImage("MarchImage", {
-            .format = vk::Format::eR8G8B8A8Unorm,
-        });
-        const ResourceRef marchImageUniform = builder.createUniformImage("MarchImageUniform", {
-            .image = marchImage,
-            .type = UniformImageType::Storage,
-            .frequency = UniformFrequency::PerFrame,
-            .binding = 1
-        });
-        ComputePassInfo computePass{};
-        computePass.name = "RayMarchCompute";
-        computePass.outputs = { marchImage };
-        computePass.computeShader = assets.get<SpirVShaderCode>("shaders/march.comp.glsl");
-        computePass.execution = [](const vk::CommandBuffer& cmd) {
-            auto& window = Application::Get().getWindow();
-            cmd.dispatch(ceil((float) window.getWidth() / 16.0f), ceil((float) window.getHeight() / 16.0f), 1);
-        };
-        builder.addComputePass(computePass);
+        m_skybox.addSkyboxPass(builder, sceneImage, cameraUniform);
 
-        builder.setBackBuffer(marchImage);
+        builder.addRenderPass(FGBRenderPassInfo{
+            .vertexShaderPath = "shaders/gbuffer.vert.glsl",
+            .fragmentShaderPath = "shaders/gbuffer.frag.glsl",
+            .inputs = {cameraUniform,textureUniform},
+            .outputs = {sceneImage,depth},
+            .callback = [&](vk::CommandBuffer cmd, ResourceRef pipeline, std::unordered_map<uint32_t, FrameGraph::DescriptorSet> sets) {
+                sets.at(0).bindGraphics(pipeline, cmd);
+                m_vb.bind(cmd);
+                cmd.draw(m_vbc, 1, 0, 0);
+                INFO("Draw!");
+            },
+            .vertexInputData = getMeshVertexData(),
+        });
+
+        auto backbuffer = builder.createImage();
+        auto sceneStorageImage = builder.addUniformStorageImage(1, 0, sceneImage);
+        auto backbufferStorageImage = builder.addUniformStorageImage(1, 1, backbuffer);
+
+        builder.addComputePass(FGBComputePassInfo{
+            .computeShaderPath = "shaders/colormap.comp.glsl",
+            .inputs = { sceneStorageImage },
+            .outputs = { backbufferStorageImage },
+            .callback = [&](vk::CommandBuffer cmd, ResourceRef pipeline, std::unordered_map<uint32_t, FrameGraph::DescriptorSet> sets) {
+                sets.at(1).bindCompute(pipeline, cmd);
+                cmd.dispatch(1, 1, 1);
+            },
+        });
+
+        builder.setBackbuffer(backbuffer);
+        m_frameGraph = builder.bake();
+        return m_frameGraph.getCommands();
     }
 }
