@@ -1,4 +1,9 @@
 #include "Assets.h"
+#include "Mesh.h"
+#include "TextureData.h"
+
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
 
 namespace vanguard {
     Assets::Assets() {
@@ -9,6 +14,15 @@ namespace vanguard {
         });
         addLoader("glsl", [](const File& file) {
             return loadSpirVShader(file);
+        });
+        addLoader("obj", [](const File& file) {
+            return loadObj(file);
+        });
+        addLoader("png", [](const File& file) {
+            return loadTexture(file);
+        });
+        addLoader("jpg", [](const File& file) {
+            return loadTexture(file);
         });
     }
 

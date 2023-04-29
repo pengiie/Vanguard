@@ -4,6 +4,7 @@
 
 #include "../graphics/RenderSystem.h"
 #include "../util/Frustum.h"
+#include "../graphics/Buffer.h"
 
 namespace vanguard {
     struct CameraData {

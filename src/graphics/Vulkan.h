@@ -39,5 +39,8 @@ namespace vanguard {
         static Allocator& getAllocator();
         static vk::raii::DescriptorPool& getDescriptorPool();
         static std::mutex& getVmaMutex();
+
+        static vk::Format getDepthFormat();
+        static uint32_t padUniformBufferSize(uint32_t originalSize);
     };
 }

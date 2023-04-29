@@ -15,7 +15,7 @@ namespace vanguard {
                 .farPlane = 1000.0f
         };
 
-        m_cameraBuffer.create(sizeof(CameraData));
+        m_cameraBuffer.create<CameraData>();
         m_data = {
                 .view = glm::mat4(1.0f),
                 .projection = createPerspective()
@@ -73,7 +73,7 @@ namespace vanguard {
         m_data.projView = m_data.projection * m_data.view;
         m_data.screenToWorld = createToWorld();
 
-        m_cameraBuffer.update(&m_data, sizeof(CameraData));
+        m_cameraBuffer.update<CameraData>(m_data);
 
         m_frustum = createFrustum();
     }

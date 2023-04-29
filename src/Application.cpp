@@ -39,8 +39,6 @@ namespace vanguard {
             TIMER("Application::loop");
             Window::pollEvents();
 
-            m_renderSystem.beginFrame();
-
             m_scene->update(Window::getDeltaTime());
             m_scheduler.update();
 
@@ -54,6 +52,8 @@ namespace vanguard {
 
         // Wait for the device to finish all operations
         Vulkan::getDevice().waitIdle();
+
+        m_scene.reset();
         Vulkan::destroyImGui(m_imGuiWindow);
         Window::terminateGLFW();
     }
